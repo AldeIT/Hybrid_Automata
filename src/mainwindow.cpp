@@ -358,7 +358,12 @@ void MainWindow::clearAll(int mode)
         for (int i = 0; i < drawnArrows.size(); i++)
         {
             // delete drawnArrows[i];
+
+            drawnArrows[i]->textItem->setVisible(false);
+            drawnArrows[i]->setVisible(false);
             scene->removeItem(drawnArrows[i]);
+            ui->graphicsView->invalidateScene();
+            ui->graphicsView->update();
         }
         drawnArrows.clear();
         for (int i = 0; i < circles.size(); i++)
