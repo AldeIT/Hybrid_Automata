@@ -64,7 +64,7 @@ The application is a simulator designed to define a system of concurrent hybrid 
    ./main
    ```
 
-### Windows (to be completed)
+### Windows
 
 1. **Clone the repository:**
 
