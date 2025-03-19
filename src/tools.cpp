@@ -8,6 +8,8 @@
 #define DEBUG_COMMENT(comment)
 #endif
 
+/// @brief prints the system variables map
+/// @param map the pointer to unordered map
 void printMap(unordered_map<string, double *> &sharedVariables)
 {
     for (auto &pair : sharedVariables)
@@ -16,6 +18,10 @@ void printMap(unordered_map<string, double *> &sharedVariables)
     }
 }
 
+/// @brief splits the string into different parts given a delimiter and returns a vector of substrings;
+/// @param s the string to split
+/// @param delimiter the delimiter
+/// @return a vector of substrings
 vector<string> split_string(const string &s, char delimiter)
 {
     vector<string> tokens;
@@ -30,6 +36,14 @@ vector<string> split_string(const string &s, char delimiter)
     return tokens;
 }
 
+/// @brief Replace occurrences of a substring in a string.
+/// This function replaces all occurrences of the substring 'remove' in the string 'origin'
+/// with the substring 'to_replace'. It performs replacements only if the substring 'remove'
+/// is found in positions where it represents a variable name.
+/// @param origin The original string.
+/// @param remove The substring to be replaced.
+/// @param to_replace The substring to replace 'remove' with.
+/// @return The modified string after replacement.
 string replace_var(string origin, string remove, string to_replace)
 {
     int next;
@@ -38,7 +52,6 @@ string replace_var(string origin, string remove, string to_replace)
     while (pos != string::npos)
     {
         next = pos + remove.length();
-        DEBUG_COMMENT("Siamo dentro\n");
         replace_string = false;
         if (pos + 1 < origin.length() && pos - 1 >= 0)
         { // something left and something right
@@ -62,13 +75,7 @@ string replace_var(string origin, string remove, string to_replace)
         }
         pos = origin.find(remove, pos + 1);
     }
-     setlocale(LC_ALL, "C");
-/*
-#ifdef WINDOWS
-    ;
-#else
-    replace(origin.begin(), origin.end(), '.', ',');
-#endif
-*/
+    setlocale(LC_ALL, "C");
+
     return origin;
 }

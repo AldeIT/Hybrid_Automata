@@ -7,9 +7,17 @@
 #define DEBUG_COMMENT(comment)
 #endif
 
-/// @brief constructor
-/// @param automata the Automata of the System
-/// @param VariablesDependence automata-variables dependence of the system
+/// @brief Constructs a System object with the given parameters.
+///
+/// Initializes the System with the provided set of automata, dependence map, automata variables map, temporary variables map,
+/// time step delta, and total number of seconds to simulate.
+///
+/// @param automata A vector containing Automata objects representing the system's state.
+/// @param AutomataDependence An unordered_map containing the dependence relationships between automata.
+/// @param automataVariables An unordered_map containing pointers to double variables associated with automata.
+/// @param tempVariables An unordered_map containing temporary double variables used in calculations.
+/// @param delta The time step for each simulation iteration.
+/// @param numSeconds The total number of seconds to simulate.
 System::System(vector<Automata> automata, unordered_map<string, string> &AutomataDependence, unordered_map<string, double *> &automataVariables, unordered_map<string, double> &tempVariables, double delta, double numSeconds)
 {
     this->automata = automata;
@@ -39,24 +47,12 @@ unordered_map<string, string> System::getAutomataDependence()
     return this->AutomataDependence;
 }
 
+/// @brief Refreshes the automata variables with the temporary variables.
+///
+/// Updates the values of the automata variables with the values stored in the temporary variables.
+/// After updating, clears the temporary variables map.
 void System::refreshVariables()
 {
-    /*
-
-    temp:
-
-
-    shared:
-    x = 15
-    a = 3 -> 5
-
-
-    for ogni variabile temp:
-        shared[temp.first] = temp.second;
-
-    temp.clear()
-
-    */
 
     for (auto const &key : tempVariables)
     {
@@ -66,9 +62,17 @@ void System::refreshVariables()
     tempVariables.clear();
 }
 
-unordered_map<string, double> System::getVariables(){
+/// @brief Retrieves a copy of the current values of the system variables.
+///
+/// Creates a copy of the current values stored in the system's automata variables
+/// and returns it as an unordered map.
+///
+/// @return An unordered map containing the current values of the system variables.
+unordered_map<string, double> System::getVariables()
+{
     unordered_map<string, double> temp;
-    for (const auto& pair : this->automataVariables) {
+    for (const auto &pair : this->automataVariables)
+    {
         temp[pair.first] = *(pair.second);
     }
     return temp;

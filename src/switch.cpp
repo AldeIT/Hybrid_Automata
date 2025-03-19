@@ -1,33 +1,53 @@
 #include "switch.h"
 
-Animator::Animator(QObject* target, QObject* parent) : QVariantAnimation(parent) {
+/// @brief Constructor for Animator.
+///
+/// @param target The target object to animate.
+/// @param parent The parent object.
+Animator::Animator(QObject *target, QObject *parent) : QVariantAnimation(parent)
+{
     setTargetObject(target);
 }
 
-Animator::~Animator() {
+/// @brief Destructor for Animator.
+Animator::~Animator()
+{
     stop();
 }
 
-QObject* Animator::targetObject() const {
+/// @brief Sets the target object for the animation.
+///
+/// @param _target Pointer to the target object.
+///
+/// @return None.
+QObject *Animator::targetObject() const
+{
     return target.data();
 }
 
-void Animator::setTargetObject(QObject* _target) {
+/// @brief Sets the target object to animate.
+/// @param _target The target object.
+void Animator::setTargetObject(QObject *_target)
+{
     if (target.data() == _target)
         return;
 
-    if (isRunning()) {
-        //qWarning("Animation::setTargetObject: you can't change the target of a running animation");
+    if (isRunning())
+    {
         return;
     }
 
     target = _target;
 }
 
-void Animator::updateCurrentValue(const QVariant& value) {
+/// @brief Updates the current value of the animation.
+/// @param value The new value (unused).
+void Animator::updateCurrentValue(const QVariant &value)
+{
     Q_UNUSED(value);
 
-    if (!target.isNull()) {
+    if (!target.isNull())
+    {
         auto update = QEvent(QEvent::StyleAnimationUpdate);
         update.setAccepted(false);
         QCoreApplication::sendEvent(target.data(), &update);
@@ -36,76 +56,98 @@ void Animator::updateCurrentValue(const QVariant& value) {
     }
 }
 
-void Animator::updateState(QAbstractAnimation::State newState, QAbstractAnimation::State oldState) {
-    if (target.isNull() && oldState == Stopped) {
-        //qWarning("Animation::updateState: Changing state of an animation without target");
+/// @brief Updates the state of the animation.
+/// @param newState The new state of the animation.
+/// @param oldState The previous state of the animation.
+void Animator::updateState(QAbstractAnimation::State newState, QAbstractAnimation::State oldState)
+{
+    if (target.isNull() && oldState == Stopped)
+    {
         return;
     }
 
     QVariantAnimation::updateState(newState, oldState);
-
-    if (!endValue().isValid() && direction() == Forward) {
-        //qWarning("Animation::updateState (%s): starting an animation without end value", targetObject()->metaObject()->className());
-    }
 }
 
-void Animator::setup(int duration, QEasingCurve easing) {
+/// @brief Sets up the animator with the given duration and easing curve.
+/// @param duration The duration of the animation.
+/// @param easing The easing curve to be used.
+void Animator::setup(int duration, QEasingCurve easing)
+{
     setDuration(duration);
     setEasingCurve(easing);
 }
 
-void Animator::interpolate(const QVariant& _start, const QVariant& end) {
+/// @brief Interpolates between the start and end values and starts the animation.
+/// @param _start The start value of the animation.
+/// @param end The end value of the animation.
+void Animator::interpolate(const QVariant &_start, const QVariant &end)
+{
     setStartValue(_start);
     setEndValue(end);
     start();
 }
 
-void Animator::setCurrentValue(const QVariant& value) {
+/// @brief Sets the current value of the animation.
+/// @param value The current value to set.
+void Animator::setCurrentValue(const QVariant &value)
+{
     setStartValue(value);
     setEndValue(value);
     updateCurrentValue(currentValue());
 }
 
-
-
-SelectionControl::SelectionControl(QWidget* parent) : QAbstractButton(parent) {
+/// @brief Constructor for SelectionControl.
+/// @param parent The parent widget.
+SelectionControl::SelectionControl(QWidget *parent) : QAbstractButton(parent)
+{
     setObjectName("SelectionControl");
     setCheckable(true);
 }
 
-SelectionControl::~SelectionControl() {
-
+SelectionControl::~SelectionControl()
+{
 }
 
-void SelectionControl::enterEvent(QEnterEvent* e) {
+/// @brief Handles the event when the mouse enters the widget.
+/// @param e The event object containing event information.
+void SelectionControl::enterEvent(QEnterEvent *e)
+{
     setCursor(Qt::PointingHandCursor);
     QAbstractButton::enterEvent(e);
 }
 
-Qt::CheckState SelectionControl::checkState() const {
+/// @brief Returns the check state of the selection control.
+/// @return The check state of the selection control.
+Qt::CheckState SelectionControl::checkState() const
+{
     return isChecked() ? Qt::Checked : Qt::Unchecked;
 }
 
-void SelectionControl::checkStateSet() {
+/// @brief Sets the check state of the selection control and emits the stateChanged signal.
+void SelectionControl::checkStateSet()
+{
     const auto state = checkState();
     emit stateChanged(state);
     toggle(state);
 }
 
-void SelectionControl::nextCheckState() {
+/// @brief Calls the nextCheckState of the parent class and then checkStateSet of SelectionControl.
+void SelectionControl::nextCheckState()
+{
     QAbstractButton::nextCheckState();
     SelectionControl::checkStateSet();
 }
 
-
-
-void Switch::init() {
+/// @brief Initializes the Switch widget.
+void Switch::init()
+{
     setFont(style.font);
     setObjectName("Switch");
     /* setup animations */
-    thumbBrushAnimation = new Animator{ this, this };
-    trackBrushAnimation = new Animator{ this, this };
-    thumbPosAniamtion = new Animator{ this, this };
+    thumbBrushAnimation = new Animator{this, this};
+    trackBrushAnimation = new Animator{this, this};
+    thumbPosAniamtion = new Animator{this, this};
     thumbPosAniamtion->setup(style.thumbPosAniamtion.duration, style.thumbPosAniamtion.easing);
     trackBrushAnimation->setup(style.trackBrushAnimation.duration, style.trackBrushAnimation.easing);
     thumbBrushAnimation->setup(style.thumbBrushAnimation.duration, style.thumbBrushAnimation.easing);
@@ -122,41 +164,65 @@ void Switch::init() {
     setSizePolicy(QSizePolicy(QSizePolicy::Policy::Preferred, QSizePolicy::Policy::Fixed));
 }
 
-QRect Switch::indicatorRect() {
+/// @brief Returns the rectangle for the switch indicator.
+/// @return The rectangle representing the switch indicator.
+QRect Switch::indicatorRect()
+{
     const auto w = style.indicatorMargin.left() + style.height + style.indicatorMargin.right();
     return ltr(this) ? QRect(0, 0, w, style.height) : QRect(width() - w, 0, w, style.height);
 }
 
-QRect Switch::textRect() {
+/// @brief Returns the rectangle for the switch text.
+/// @return The rectangle representing the switch text.
+QRect Switch::textRect()
+{
     const auto w = style.indicatorMargin.left() + style.height + style.indicatorMargin.right();
     return ltr(this) ? rect().marginsRemoved(QMargins(w, 0, 0, 0)) : rect().marginsRemoved(QMargins(0, 0, w, 0));
 }
 
-Switch::Switch(QWidget* parent) : SelectionControl(parent) {
+/// @brief Constructor for Switch.
+/// @param parent The parent widget.
+Switch::Switch(QWidget *parent) : SelectionControl(parent)
+{
     init();
 }
 
-Switch::Switch(const QString& text, QWidget* parent) : Switch(parent) {
+/// @brief Constructor for Switch.
+/// @param text The text to display.
+/// @param parent The parent widget.
+Switch::Switch(const QString &text, QWidget *parent) : Switch(parent)
+{
     setText(text);
 }
 
-Switch::Switch(const QString& text, const QBrush& brush, QWidget* parent) : Switch(text, parent) {
+/// @brief Constructor for Switch with custom text and brush.
+/// @param text The text to display.
+/// @param brush The brush color.
+/// @param parent The parent widget.
+Switch::Switch(const QString &text, const QBrush &brush, QWidget *parent) : Switch(text, parent)
+{
     style.thumbOnBrush = brush.color();
     style.trackOnBrush = brush.color();
 }
 
-Switch::~Switch() {
-
+Switch::~Switch()
+{
 }
 
-QSize Switch::sizeHint() const {
+/// @brief Returns the preferred size hint for the Switch widget.
+/// @return The preferred size hint.
+QSize Switch::sizeHint() const
+{
     auto h = style.height;
     auto w = style.indicatorMargin.left() + style.height + style.indicatorMargin.right() + QFontMetrics(font()).horizontalAdvance(text());
 
     return QSize(w, h);
 }
 
-void Switch::paintEvent(QPaintEvent*) {
+/// @brief Handles the paint event for the Switch widget.
+/// @param event The paint event.
+void Switch::paintEvent(QPaintEvent *)
+{
     /* for desktop usage we do not need Radial reaction */
 
     QPainter p(this);
@@ -168,7 +234,8 @@ void Switch::paintEvent(QPaintEvent*) {
     trackMargin.setBottom(trackMargin.bottom() + 2);
     QRectF trackRect = _indicatorRect.marginsRemoved(trackMargin);
 
-    if (isEnabled()) {
+    if (isEnabled())
+    {
         p.setOpacity(1.0);
         p.setPen(Qt::NoPen);
         /* draw track */
@@ -185,7 +252,6 @@ void Switch::paintEvent(QPaintEvent*) {
 
         p.setBrush(thumbBrushAnimation->currentValue().value<QColor>());
         p.setRenderHint(QPainter::Antialiasing, true);
-        //        qDebug() << thumbRect << thumbPosAniamtion->currentValue();
         p.drawEllipse(thumbRect.center(), THUMB_RADIUS - SHADOW_ELEVATION - 1.0, THUMB_RADIUS - SHADOW_ELEVATION - 1.0);
         p.setRenderHint(QPainter::Antialiasing, false);
 
@@ -197,7 +263,9 @@ void Switch::paintEvent(QPaintEvent*) {
         p.setPen(palette().color(QPalette::Active, QPalette::ButtonText));
         p.setFont(font());
         p.drawText(_textRect, Qt::AlignLeft | Qt::AlignVCenter, text());
-    } else {
+    }
+    else
+    {
         p.setOpacity(style.trackDisabledOpacity);
         p.setPen(Qt::NoPen);
         // draw track
@@ -232,36 +300,51 @@ void Switch::paintEvent(QPaintEvent*) {
     }
 }
 
-void Switch::resizeEvent(QResizeEvent* e) {
+/// @brief Handles the resize event for the Switch widget.
+/// @param e The resize event.
+void Switch::resizeEvent(QResizeEvent *e)
+{
     shadowPixmap = Style::drawShadowEllipse(THUMB_RADIUS, SHADOW_ELEVATION, QColor(0, 0, 0, 70));
     SelectionControl::resizeEvent(e);
 }
 
-void Switch::toggle(Qt::CheckState state) {
-    if (state == Qt::Checked) {
+/// @brief Toggles the switch state based on the provided check state.
+/// @param state The check state.
+void Switch::toggle(Qt::CheckState state)
+{
+    if (state == Qt::Checked)
+    {
         const QVariant posEnd = (style.indicatorMargin.left() + style.indicatorMargin.right() + 2) * 2;
         const QVariant thumbEnd = colorFromOpacity(style.thumbOnBrush, style.thumbOnOpacity);
         const QVariant trackEnd = colorFromOpacity(style.trackOnBrush, style.trackOnOpacity);
 
-        if (!isVisible()) {
+        if (!isVisible())
+        {
             thumbPosAniamtion->setCurrentValue(posEnd);
             thumbBrushAnimation->setCurrentValue(thumbEnd);
             trackBrushAnimation->setCurrentValue(trackEnd);
-        } else {
+        }
+        else
+        {
             thumbPosAniamtion->interpolate(0, posEnd);
             thumbBrushAnimation->interpolate(colorFromOpacity(style.thumbOffBrush, style.thumbOffOpacity), thumbEnd);
             trackBrushAnimation->interpolate(colorFromOpacity(style.trackOffBrush, style.trackOffOpacity), trackEnd);
         }
-    } else { // Qt::Unchecked
+    }
+    else
+    { // Qt::Unchecked
         const QVariant posEnd = 0;
         const QVariant thumbEnd = colorFromOpacity(style.thumbOffBrush, style.thumbOffOpacity);
         const QVariant trackEnd = colorFromOpacity(style.trackOffBrush, style.trackOffOpacity);
 
-        if (!isVisible()) {
+        if (!isVisible())
+        {
             thumbPosAniamtion->setCurrentValue(posEnd);
             thumbBrushAnimation->setCurrentValue(thumbEnd);
             trackBrushAnimation->setCurrentValue(trackEnd);
-        } else {
+        }
+        else
+        {
             thumbPosAniamtion->interpolate(thumbPosAniamtion->currentValue().toInt(), posEnd);
             thumbBrushAnimation->interpolate(colorFromOpacity(style.thumbOnBrush, style.thumbOnOpacity), thumbEnd);
             trackBrushAnimation->interpolate(colorFromOpacity(style.trackOnBrush, style.trackOnOpacity), trackEnd);

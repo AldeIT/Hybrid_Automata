@@ -97,14 +97,14 @@ unordered_map<string, double *> *Automata::getAutomataVariables()
 }
 
 /// @brief set the map string->double of the variables
-/// @param autoamtaVariables the new map
-void Automata::setAutomataVariables(unordered_map<string, double *> &autoamtaVariables)
+/// @param automataVariables the new map
+void Automata::setAutomataVariables(unordered_map<string, double *> &automataVariables)
 {
-    this->automataVariables = &autoamtaVariables;
+    this->automataVariables = &automataVariables;
 }
 
-/// @brief set the map string->double of the variables
-/// @param autoamtaVariables the new map
+/// @brief Set the temporary variables for the automaton. This method sets the temporary variables used by the automaton to the provided map.
+/// @param tempVariables A reference to an unordered_map<string, double> containing the temporary variables.
 void Automata::setTempVariables(unordered_map<string, double> &tempVariables)
 {
     this->tempVariables = &tempVariables;
@@ -163,18 +163,10 @@ string Automata::getInstructions()
 /// @return 1 if the current node changed, 0 otherwise
 bool Automata::checkForChanges()
 {
-    /* se si dovesse gestire la questione della prima accensione con condizioni di spostamento fin da subito
-        basta controllare il primo istante
-        if (time==1){
-            checktransition....
-        }
-        ricordati di rendere time globale
-    */
-
     currentNode.executeNodeInstructions(*automataVariables, *tempVariables, time_inside_node);
     time_inside_node++;
 
-    string newNode = currentNode.checkTransitions(*automataVariables);
+    string newNode = currentNode.checkTransitions(*automataVariables, *tempVariables);
 
     if (newNode != currentNode.getName())
     {
@@ -189,11 +181,12 @@ bool Automata::checkForChanges()
     return 1;
 }
 
+/// @brief Get the name of the current node.
+/// @return The name of the current node.
 string Automata::getCurrentNodeName()
 {
     return this->currentNode.getName();
 }
-
 
 /// @brief to string
 ostream &operator<<(ostream &os, Automata &obj)
@@ -204,7 +197,6 @@ ostream &operator<<(ostream &os, Automata &obj)
     {
         os << "- " << n << "\n";
     }
-    // os << "Instruction:" << obj.getInstructions() << "\n";
     os << "Initial Node: " << obj.getInitialNode().getName() << "\n";
     os << "Current Node: " << obj.getCurrentNode().getName() << "\n";
     os << "Final Nodes: \n";

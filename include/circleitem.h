@@ -10,9 +10,12 @@
 #ifndef CIRCLEITEM_H
 #define CIRCLEITEM_H
 
-class CircleItem : public QGraphicsItemGroup{
+/// @brief Class that represents a Circle in the GUI
+class CircleItem : public QGraphicsItemGroup
+{
 public:
-    CircleItem(QGraphicsEllipseItem* ellipse, QGraphicsTextItem *textItem, QString automata) {
+    CircleItem(QGraphicsEllipseItem *ellipse, QGraphicsTextItem *textItem, QString automata)
+    {
         // Retrieve properties from the ellipse
 
         addToGroup(ellipse);
@@ -28,17 +31,17 @@ public:
         instructions = "default";
         startNode = false;
         this->automata = automata;
-
     }
 
     // Override type() function to return a unique value for CircleItem
-    int type() const override {
+    int type() const override
+    {
         return CIRCLEITEM_TYPE;
     }
 
-
     // Comparison operator to check equality
-    bool operator==(const CircleItem& other) const {
+    bool operator==(const CircleItem &other) const
+    {
         return ellipse->sceneBoundingRect().center() == other.ellipse->sceneBoundingRect().center() &&
                ellipse->rect().size() == other.ellipse->rect().size() &&
                ellipse->pen() == other.ellipse->pen() &&
@@ -46,7 +49,8 @@ public:
     }
 
     // Overload the << operator for qDebug()
-    friend QDebug operator<<(QDebug dbg, const CircleItem& circleItem) {
+    friend QDebug operator<<(QDebug dbg, const CircleItem &circleItem)
+    {
         dbg.nospace() << "CircleItem: "
                       << "Position=" << circleItem.ellipse->sceneBoundingRect().center() << "\n";
         return dbg.space();
@@ -55,15 +59,13 @@ public:
     QSizeF size;
     QPen pen;
     QBrush brush;
-    QGraphicsEllipseItem* ellipse;
-    QGraphicsTextItem* textItem;
+    QGraphicsEllipseItem *ellipse;
+    QGraphicsTextItem *textItem;
     QString name;
     QString instructions;
     QString description;
     QString automata;
     bool startNode;
-
 };
-
 
 #endif // CIRCLEITEM_H

@@ -108,7 +108,6 @@ bool Transition::evaluateSingleEquation(string &expression)
         double b = te_interp(right.c_str(), 0);
         return a != b;
     }
-
     // Return false for invalid expressions
     return false;
 }
@@ -211,7 +210,7 @@ string preProcessing(string str)
 /// @brief replace the variables in the condition with the real values and check them
 /// @param variables the map containing the couple <name, value>
 /// @return the evaluation
-bool Transition::checkCondition(unordered_map<string, double *> &variables)
+bool Transition::checkCondition(unordered_map<string, double *> &variables, unordered_map<string, double> &justModified)
 {
     string condition = getCondition();
     int pos;
@@ -220,14 +219,14 @@ bool Transition::checkCondition(unordered_map<string, double *> &variables)
 
     for (pair<string, double *> pair : variables)
     {
-        /*
-        pos = condition.find(pair.first);
-        while (pos != string::npos)
+        if (justModified.contains(pair.first))
         {
-            condition.replace(pos, pair.first.length(), to_string(*(pair.second)));
-            pos = condition.find(pair.first);
-        }*/
-        condition = replace_var(condition, pair.first, to_string(*(pair.second)));
+            condition = replace_var(condition, pair.first, to_string(justModified[pair.first]));
+        }
+        else
+        {
+            condition = replace_var(condition, pair.first, to_string(*(pair.second)));
+        }
     }
 
     DEBUG_COMMENT("Condizione post-replace: " << condition << "\n");

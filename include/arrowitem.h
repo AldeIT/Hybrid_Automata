@@ -5,6 +5,7 @@
 
 #include <QGraphicsTextItem>
 
+/// @brief Class that rapresents an Arrow in the GUI
 class ArrowItem : public QGraphicsItem
 {
 public:
@@ -13,8 +14,8 @@ public:
     QRectF boundingRect() const override;
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = nullptr) override;
     QPainterPath shape() const override;
-    bool isMyStartOrEnd(QGraphicsEllipseItem* check);
-    bool operator==(const ArrowItem& other) const;
+    bool isMyStartOrEnd(QGraphicsEllipseItem *check);
+    bool operator==(const ArrowItem &other) const;
     void handleClicked();
     QGraphicsItem *startItem;
     QGraphicsItem *endItem;
@@ -28,7 +29,6 @@ protected:
 
 private:
     QRectF calculateArrowRect() const;
-
 };
 
 #endif // ARROWITEM_H

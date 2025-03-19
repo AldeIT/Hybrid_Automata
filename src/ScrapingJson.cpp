@@ -5,7 +5,6 @@
 #include <string>
 #include <iostream>
 
-
 #ifdef DEBUG_MODE
 #define DEBUG_COMMENT(comment) std::cout << "[DEBUG] " << comment << std::endl;
 #else
@@ -15,10 +14,9 @@
 using namespace std;
 using json = nlohmann::json;
 
-/// @brief creates all the automatas
-/// @return the automatas
-
-
+/// @brief Scrapes JSON data and constructs a System object based on the parsed data.
+/// @param c The path to the JSON file.
+/// @return A System object constructed from the parsed JSON data.
 System UtilsJson::ScrapingJson(string c)
 {
     std::ifstream f(c);
@@ -34,25 +32,10 @@ System UtilsJson::ScrapingJson(string c)
     setlocale(LC_ALL, "C");
     // set global variables
     string h_string = data["system"]["global"]["delta"];
-/*
-#ifdef WINDOWS
-    ;
-#else
-    replace(h_string.begin(), h_string.end(), '.', ',');
-#endif
-*/
     double system_delta = stod(h_string);
-    //std::cout <<"DeltaScraping: " << delta;
     string tfinal_string = data["system"]["global"]["finaltime"];
-/*
-#ifdef WINDOWS
-    ;
-#else
-    replace(tfinal_string.begin(), tfinal_string.end(), '.', ',');
-#endif
-*/
-    double system_numSeconds = stod(tfinal_string);
 
+    double system_numSeconds = stod(tfinal_string);
 
     // find all the automata in settings.json
     for (json automata : data["system"]["automata"])
@@ -63,7 +46,7 @@ System UtilsJson::ScrapingJson(string c)
         // find all the nodes for each automata
         for (json node : automata["node"])
         {
-            Node n(node["name"], node["description"], node["instructions"], (node["flag"] == "start") ? true : false , system_delta, system_numSeconds);
+            Node n(node["name"], node["description"], node["instructions"], (node["flag"] == "start") ? true : false, system_delta, system_numSeconds);
             arrNodes.push_back(n);
             if (node["flag"] == "start")
             {

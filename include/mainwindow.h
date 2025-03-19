@@ -21,15 +21,16 @@
 #include <string>
 #include <unordered_map>
 
-
-namespace Ui {
-class MainWindow;
+namespace Ui
+{
+    class MainWindow;
 }
 
 class Automata;
 
-class Switch; //forward declaration
+class Switch; // forward declaration
 
+/// @brief class for the MainWindow.
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
@@ -40,29 +41,29 @@ public:
 
 private:
     Ui::MainWindow *ui;
-    QWidget *leftWidget; // The left QFrame
+    QWidget *leftWidget;  // The left QFrame
     QWidget *rightWidget; // The right QFrame
     QGraphicsScene *scene;
     QGraphicsEllipseItem *ellipse;
     QGraphicsEllipseItem *selectedCircle1 = nullptr;
     QGraphicsEllipseItem *selectedCircle2 = nullptr;
-    QList<CircleItem*> circles;
+    QList<CircleItem *> circles;
     QTimer *timer;
-    QMap<QGraphicsEllipseItem*, QList<QGraphicsEllipseItem*>> arrows;
+    QMap<QGraphicsEllipseItem *, QList<QGraphicsEllipseItem *>> arrows;
     QMap<QString, QString> variablesValues;
-    QMap<QGraphicsEllipseItem*, CircleItem*> ellipseMap;
+    QMap<QGraphicsEllipseItem *, CircleItem *> ellipseMap;
     QMap<QString, QColor> automataColors;
     QList<QString> actualVariables;
-    QList<ArrowItem*> drawnArrows;
+    QList<ArrowItem *> drawnArrows;
     QLineEdit *valueLabel;
-    ArrowItem * selectedArrow;
-    Switch* switchDebug;
+    ArrowItem *selectedArrow;
+    Switch *switchDebug;
     QList<QString> automatas;
     int finalTime;
     double delta;
     QList<int> posUpdateButton;
     bool isCircleSelected = false;
-    bool ascendingSelection=true;
+    bool ascendingSelection = true;
     bool dragMode = false;
     bool runningStatus = false;
     void deleteSelectedItems();
@@ -83,12 +84,15 @@ private:
     std::vector<Automata> v;
     int _count;
     double currentTime;
-    QMap<std::string,QGraphicsEllipseItem*> tempMap;
+    QMap<std::string, QGraphicsEllipseItem *> tempMap;
     QList<double> trasparenze;
     int ct;
     int goalStep;
     int istanti;
     std::unordered_map<std::string, double> updateVariables;
+    QVector<int> counter_colors;
+    int colors_left = 10;
+
 protected:
     bool eventFilter(QObject *watched, QEvent *event); // Declare eventFilter function
 

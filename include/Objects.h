@@ -17,7 +17,7 @@ public:
     bool evaluateSingleEquation(string &expression);
     char evaluateLogicalEquation(string str);
     bool solve(string str);
-    bool checkCondition(unordered_map<string, double *> &variables);
+    bool checkCondition(unordered_map<string, double *> &variables, unordered_map<string, double> &tempVariables);
     friend ostream &operator<<(ostream &os, Transition &obj);
 };
 
@@ -53,7 +53,8 @@ private:
     unordered_map<Transition, string, TransitionHash, TransitionEqual> transitions; /*an hashmap that contains couples that represent each edge (condition, destination) */
     unordered_map<string, double *> cauchy;                                         /*an hashmap that stores initial values for differential equations*/
     bool firstVisit;                                                                /*true if we just arrived into a node*/
-    string instructions;                                                            /*all the instructions inside the node*/
+    string instructions;    /*all the instructions inside the node*/
+    unordered_map<string, vector<double>> map_ode_solver_values;
     vector<double> ode_solver_values;
     vector<double> ode_solver_times;
     double delta;
@@ -72,7 +73,7 @@ public:
     vector<Transition> getTransitionKeys();
     void setTransitions(unordered_map<Transition, string, TransitionHash, TransitionEqual> &transitions);
     void addTransition(string condition, string destination);
-    string checkTransitions(unordered_map<string, double *> &sharedVariables);
+    string checkTransitions(unordered_map<string, double *> &sharedVariables, unordered_map<string, double> &tempVariables);
     double ode_solver(string, double, int, double, double, unordered_map<string, double *> &sharedVariables);
     void executeNodeInstructions(unordered_map<string, double *> &sharedVariables, unordered_map<string, double> &tempVariables, int time);
     bool operator==(const Node &other);

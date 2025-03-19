@@ -35,7 +35,6 @@ int main(int argc, char *argv[])
                       "   font-size: 10pt;"
                       "}");
 
-
     MainWindow w;
     w.setWindowTitle("CHAOS");
     w.show();

@@ -44,55 +44,86 @@ For log = natural log uncomment the next line. */
 #include <limits.h>
 
 #ifndef NAN
-#define NAN (0.0/0.0)
+#define NAN (0.0 / 0.0)
 #endif
 
 #ifndef INFINITY
-#define INFINITY (1.0/0.0)
+#define INFINITY (1.0 / 0.0)
 #endif
-
 
 typedef double (*te_fun2)(double, double);
 
-enum {
-    TOK_NULL = TE_CLOSURE7+1, TOK_ERROR, TOK_END, TOK_SEP,
-    TOK_OPEN, TOK_CLOSE, TOK_NUMBER, TOK_VARIABLE, TOK_INFIX
+enum
+{
+    TOK_NULL = TE_CLOSURE7 + 1,
+    TOK_ERROR,
+    TOK_END,
+    TOK_SEP,
+    TOK_OPEN,
+    TOK_CLOSE,
+    TOK_NUMBER,
+    TOK_VARIABLE,
+    TOK_INFIX
 };
 
+enum
+{
+    TE_CONSTANT = 1
+};
 
-enum {TE_CONSTANT = 1};
-
-
-typedef struct state {
+/// @brief Represents the state of the parsing process.
+///
+/// This structure keeps track of the current position during parsing and stores information such as the type of token encountered,
+/// the current value (if applicable), pointers to functions or variables, and the context for closures.
+typedef struct state
+{
     const char *start;
     const char *next;
     int type;
-    union {double value; const double *bound; const void *function;};
+    union
+    {
+        double value;
+        const double *bound;
+        const void *function;
+    };
     void *context;
 
     const te_variable *lookup;
     int lookup_len;
 } state;
 
-
-#define TYPE_MASK(TYPE) ((TYPE)&0x0000001F)
+#define TYPE_MASK(TYPE) ((TYPE) & 0x0000001F)
 
 #define IS_PURE(TYPE) (((TYPE) & TE_FLAG_PURE) != 0)
 #define IS_FUNCTION(TYPE) (((TYPE) & TE_FUNCTION0) != 0)
 #define IS_CLOSURE(TYPE) (((TYPE) & TE_CLOSURE0) != 0)
-#define ARITY(TYPE) ( ((TYPE) & (TE_FUNCTION0 | TE_CLOSURE0)) ? ((TYPE) & 0x00000007) : 0 )
-#define NEW_EXPR(type, ...) new_expr((type), (const te_expr*[]){__VA_ARGS__})
-#define CHECK_NULL(ptr, ...) if ((ptr) == NULL) { __VA_ARGS__; return NULL; }
+#define ARITY(TYPE) (((TYPE) & (TE_FUNCTION0 | TE_CLOSURE0)) ? ((TYPE) & 0x00000007) : 0)
+#define NEW_EXPR(type, ...) new_expr((type), (const te_expr *[]){__VA_ARGS__})
+#define CHECK_NULL(ptr, ...) \
+    if ((ptr) == NULL)       \
+    {                        \
+        __VA_ARGS__;         \
+        return NULL;         \
+    }
 
-static te_expr *new_expr(const int type, const te_expr *parameters[]) {
+/// @brief Create a new expression node.
+///
+/// This function allocates memory for a new expression node and initializes it with the specified type and parameters.
+///
+/// @param type The type of the expression node.
+/// @param parameters An array of pointers to the parameters of the expression node.
+/// @return A pointer to the newly created expression node.
+static te_expr *new_expr(const int type, const te_expr *parameters[])
+{
     const int arity = ARITY(type);
-    const int psize = sizeof(void*) * arity;
-    const int size = (sizeof(te_expr) - sizeof(void*)) + psize + (IS_CLOSURE(type) ? sizeof(void*) : 0);
+    const int psize = sizeof(void *) * arity;
+    const int size = (sizeof(te_expr) - sizeof(void *)) + psize + (IS_CLOSURE(type) ? sizeof(void *) : 0);
     te_expr *ret = malloc(size);
     CHECK_NULL(ret);
 
     memset(ret, 0, size);
-    if (arity && parameters) {
+    if (arity && parameters)
+    {
         memcpy(ret->parameters, parameters, psize);
     }
     ret->type = type;
@@ -100,51 +131,94 @@ static te_expr *new_expr(const int type, const te_expr *parameters[]) {
     return ret;
 }
 
-
-void te_free_parameters(te_expr *n) {
-    if (!n) return;
-    switch (TYPE_MASK(n->type)) {
-        case TE_FUNCTION7: case TE_CLOSURE7: te_free(n->parameters[6]);     /* Falls through. */
-        case TE_FUNCTION6: case TE_CLOSURE6: te_free(n->parameters[5]);     /* Falls through. */
-        case TE_FUNCTION5: case TE_CLOSURE5: te_free(n->parameters[4]);     /* Falls through. */
-        case TE_FUNCTION4: case TE_CLOSURE4: te_free(n->parameters[3]);     /* Falls through. */
-        case TE_FUNCTION3: case TE_CLOSURE3: te_free(n->parameters[2]);     /* Falls through. */
-        case TE_FUNCTION2: case TE_CLOSURE2: te_free(n->parameters[1]);     /* Falls through. */
-        case TE_FUNCTION1: case TE_CLOSURE1: te_free(n->parameters[0]);
+/// @brief Free the parameters of a te_expr node.
+///
+/// This function frees the parameters array of a te_expr node, if it exists.
+///
+/// @param n A pointer to the te_expr node.
+void te_free_parameters(te_expr *n)
+{
+    if (!n)
+        return;
+    switch (TYPE_MASK(n->type))
+    {
+    case TE_FUNCTION7:
+    case TE_CLOSURE7:
+        te_free(n->parameters[6]); /* Falls through. */
+    case TE_FUNCTION6:
+    case TE_CLOSURE6:
+        te_free(n->parameters[5]); /* Falls through. */
+    case TE_FUNCTION5:
+    case TE_CLOSURE5:
+        te_free(n->parameters[4]); /* Falls through. */
+    case TE_FUNCTION4:
+    case TE_CLOSURE4:
+        te_free(n->parameters[3]); /* Falls through. */
+    case TE_FUNCTION3:
+    case TE_CLOSURE3:
+        te_free(n->parameters[2]); /* Falls through. */
+    case TE_FUNCTION2:
+    case TE_CLOSURE2:
+        te_free(n->parameters[1]); /* Falls through. */
+    case TE_FUNCTION1:
+    case TE_CLOSURE1:
+        te_free(n->parameters[0]);
     }
 }
 
-
-void te_free(te_expr *n) {
-    if (!n) return;
+/// @brief Free a te_expr node.
+///
+/// This function frees the memory allocated for a te_expr node.
+///
+/// @param n A pointer to the te_expr node to be freed.
+void te_free(te_expr *n)
+{
+    if (!n)
+        return;
     te_free_parameters(n);
     free(n);
 }
 
-
-static double pi(void) {return 3.14159265358979323846;}
-static double e(void) {return 2.71828182845904523536;}
-static double fac(double a) {/* simplest version of fac */
+static double pi(void) { return 3.14159265358979323846; }
+static double e(void) { return 2.71828182845904523536; }
+static double fac(double a)
+{ /* simplest version of fac */
     if (a < 0.0)
         return NAN;
     if (a > UINT_MAX)
         return INFINITY;
     unsigned int ua = (unsigned int)(a);
     unsigned long int result = 1, i;
-    for (i = 1; i <= ua; i++) {
+    for (i = 1; i <= ua; i++)
+    {
         if (i > ULONG_MAX / result)
             return INFINITY;
         result *= i;
     }
     return (double)result;
 }
-static double ncr(double n, double r) {
-    if (n < 0.0 || r < 0.0 || n < r) return NAN;
-    if (n > UINT_MAX || r > UINT_MAX) return INFINITY;
+
+/// @brief Calculate the number of combinations (n choose r).
+///
+/// This function calculates the number of combinations (n choose r), where n and r are non-negative integers.
+/// If n or r are negative or if n is less than r, it returns NaN.
+/// If n or r exceed the maximum representable unsigned integer value, it returns positive infinity.
+///
+/// @param n The total number of items.
+/// @param r The number of items to choose.
+/// @return The number of combinations (n choose r).
+static double ncr(double n, double r)
+{
+    if (n < 0.0 || r < 0.0 || n < r)
+        return NAN;
+    if (n > UINT_MAX || r > UINT_MAX)
+        return INFINITY;
     unsigned long int un = (unsigned int)(n), ur = (unsigned int)(r), i;
     unsigned long int result = 1;
-    if (ur > un / 2) ur = un - ur;
-    for (i = 1; i <= ur; i++) {
+    if (ur > un / 2)
+        ur = un - ur;
+    for (i = 1; i <= ur; i++)
+    {
         if (result > ULONG_MAX / (un - ur + i))
             return INFINITY;
         result *= un - ur + i;
@@ -152,60 +226,78 @@ static double ncr(double n, double r) {
     }
     return result;
 }
-static double npr(double n, double r) {return ncr(n, r) * fac(r);}
+static double npr(double n, double r) { return ncr(n, r) * fac(r); }
 
 #ifdef _MSC_VER
-#pragma function (ceil)
-#pragma function (floor)
+#pragma function(ceil)
+#pragma function(floor)
 #endif
 
+/// @brief Array of builtin functions.
+///
+/// This array contains the definitions of builtin functions used in the expression evaluator.
+/// It must be in alphabetical order for efficient binary search.
 static const te_variable functions[] = {
     /* must be in alphabetical order */
-    {"abs", fabs,     TE_FUNCTION1 | TE_FLAG_PURE, 0},
-    {"acos", acos,    TE_FUNCTION1 | TE_FLAG_PURE, 0},
-    {"asin", asin,    TE_FUNCTION1 | TE_FLAG_PURE, 0},
-    {"atan", atan,    TE_FUNCTION1 | TE_FLAG_PURE, 0},
-    {"atan2", atan2,  TE_FUNCTION2 | TE_FLAG_PURE, 0},
-    {"ceil", ceil,    TE_FUNCTION1 | TE_FLAG_PURE, 0},
-    {"cos", cos,      TE_FUNCTION1 | TE_FLAG_PURE, 0},
-    {"cosh", cosh,    TE_FUNCTION1 | TE_FLAG_PURE, 0},
-    {"e", e,          TE_FUNCTION0 | TE_FLAG_PURE, 0},
-    {"exp", exp,      TE_FUNCTION1 | TE_FLAG_PURE, 0},
-    {"fac", fac,      TE_FUNCTION1 | TE_FLAG_PURE, 0},
-    {"floor", floor,  TE_FUNCTION1 | TE_FLAG_PURE, 0},
-    {"ln", log,       TE_FUNCTION1 | TE_FLAG_PURE, 0},
+    {"abs", fabs, TE_FUNCTION1 | TE_FLAG_PURE, 0},
+    {"acos", acos, TE_FUNCTION1 | TE_FLAG_PURE, 0},
+    {"asin", asin, TE_FUNCTION1 | TE_FLAG_PURE, 0},
+    {"atan", atan, TE_FUNCTION1 | TE_FLAG_PURE, 0},
+    {"atan2", atan2, TE_FUNCTION2 | TE_FLAG_PURE, 0},
+    {"ceil", ceil, TE_FUNCTION1 | TE_FLAG_PURE, 0},
+    {"cos", cos, TE_FUNCTION1 | TE_FLAG_PURE, 0},
+    {"cosh", cosh, TE_FUNCTION1 | TE_FLAG_PURE, 0},
+    {"e", e, TE_FUNCTION0 | TE_FLAG_PURE, 0},
+    {"exp", exp, TE_FUNCTION1 | TE_FLAG_PURE, 0},
+    {"fac", fac, TE_FUNCTION1 | TE_FLAG_PURE, 0},
+    {"floor", floor, TE_FUNCTION1 | TE_FLAG_PURE, 0},
+    {"ln", log, TE_FUNCTION1 | TE_FLAG_PURE, 0},
 #ifdef TE_NAT_LOG
-    {"log", log,      TE_FUNCTION1 | TE_FLAG_PURE, 0},
+    {"log", log, TE_FUNCTION1 | TE_FLAG_PURE, 0},
 #else
-    {"log", log10,    TE_FUNCTION1 | TE_FLAG_PURE, 0},
+    {"log", log10, TE_FUNCTION1 | TE_FLAG_PURE, 0},
 #endif
-    {"log10", log10,  TE_FUNCTION1 | TE_FLAG_PURE, 0},
-    {"ncr", ncr,      TE_FUNCTION2 | TE_FLAG_PURE, 0},
-    {"npr", npr,      TE_FUNCTION2 | TE_FLAG_PURE, 0},
-    {"pi", pi,        TE_FUNCTION0 | TE_FLAG_PURE, 0},
-    {"pow", pow,      TE_FUNCTION2 | TE_FLAG_PURE, 0},
-    {"sin", sin,      TE_FUNCTION1 | TE_FLAG_PURE, 0},
-    {"sinh", sinh,    TE_FUNCTION1 | TE_FLAG_PURE, 0},
-    {"sqrt", sqrt,    TE_FUNCTION1 | TE_FLAG_PURE, 0},
-    {"tan", tan,      TE_FUNCTION1 | TE_FLAG_PURE, 0},
-    {"tanh", tanh,    TE_FUNCTION1 | TE_FLAG_PURE, 0},
-    {0, 0, 0, 0}
-};
+    {"log10", log10, TE_FUNCTION1 | TE_FLAG_PURE, 0},
+    {"ncr", ncr, TE_FUNCTION2 | TE_FLAG_PURE, 0},
+    {"npr", npr, TE_FUNCTION2 | TE_FLAG_PURE, 0},
+    {"pi", pi, TE_FUNCTION0 | TE_FLAG_PURE, 0},
+    {"pow", pow, TE_FUNCTION2 | TE_FLAG_PURE, 0},
+    {"sin", sin, TE_FUNCTION1 | TE_FLAG_PURE, 0},
+    {"sinh", sinh, TE_FUNCTION1 | TE_FLAG_PURE, 0},
+    {"sqrt", sqrt, TE_FUNCTION1 | TE_FLAG_PURE, 0},
+    {"tan", tan, TE_FUNCTION1 | TE_FLAG_PURE, 0},
+    {"tanh", tanh, TE_FUNCTION1 | TE_FLAG_PURE, 0},
+    {0, 0, 0, 0}};
 
-static const te_variable *find_builtin(const char *name, int len) {
+/// @brief Find a builtin function by name.
+///
+/// This function searches for a builtin function with the specified name using binary search.
+///
+/// @param name A pointer to the name of the builtin function.
+/// @param len The length of the function name.
+/// @return A pointer to the builtin function if found, otherwise NULL.
+static const te_variable *find_builtin(const char *name, int len)
+{
     int imin = 0;
     int imax = sizeof(functions) / sizeof(te_variable) - 2;
 
     /*Binary search.*/
-    while (imax >= imin) {
-        const int i = (imin + ((imax-imin)/2));
+    while (imax >= imin)
+    {
+        const int i = (imin + ((imax - imin) / 2));
         int c = strncmp(name, functions[i].name, len);
-        if (!c) c = '\0' - functions[i].name[len];
-        if (c == 0) {
+        if (!c)
+            c = '\0' - functions[i].name[len];
+        if (c == 0)
+        {
             return functions + i;
-        } else if (c > 0) {
+        }
+        else if (c > 0)
+        {
             imin = i + 1;
-        } else {
+        }
+        else
+        {
             imax = i - 1;
         }
     }
@@ -213,225 +305,346 @@ static const te_variable *find_builtin(const char *name, int len) {
     return 0;
 }
 
-static const te_variable *find_lookup(const state *s, const char *name, int len) {
+/// @brief Find a variable in the lookup table.
+///
+/// This function searches for a variable with the specified name in the lookup table.
+///
+/// @param s A pointer to the current state of the parser.
+/// @param name A pointer to the name of the variable.
+/// @param len The length of the variable name.
+/// @return A pointer to the variable if found, otherwise NULL.
+static const te_variable *find_lookup(const state *s, const char *name, int len)
+{
     int iters;
     const te_variable *var;
-    if (!s->lookup) return 0;
+    if (!s->lookup)
+        return 0;
 
-    for (var = s->lookup, iters = s->lookup_len; iters; ++var, --iters) {
-        if (strncmp(name, var->name, len) == 0 && var->name[len] == '\0') {
+    for (var = s->lookup, iters = s->lookup_len; iters; ++var, --iters)
+    {
+        if (strncmp(name, var->name, len) == 0 && var->name[len] == '\0')
+        {
             return var;
         }
     }
     return 0;
 }
 
+static double add(double a, double b) { return a + b; }
+static double sub(double a, double b) { return a - b; }
+static double mul(double a, double b) { return a * b; }
+static double divide(double a, double b) { return a / b; }
+static double negate(double a) { return -a; }
+static double comma(double a, double b)
+{
+    (void)a;
+    return b;
+}
 
-
-static double add(double a, double b) {return a + b;}
-static double sub(double a, double b) {return a - b;}
-static double mul(double a, double b) {return a * b;}
-static double divide(double a, double b) {return a / b;}
-static double negate(double a) {return -a;}
-static double comma(double a, double b) {(void)a; return b;}
-
-
-void next_token(state *s) {
+/// @brief Advance to the next token in the input stream.
+///
+/// This function advances the parser state to the next token in the input stream. It identifies numbers, variables, operators, and special characters and updates the parser state accordingly.
+///
+/// @param s A pointer to the current state of the parser.
+void next_token(state *s)
+{
     s->type = TOK_NULL;
 
-    do {
+    do
+    {
 
-        if (!*s->next){
+        if (!*s->next)
+        {
             s->type = TOK_END;
             return;
         }
 
         /* Try reading a number. */
-        if ((s->next[0] >= '0' && s->next[0] <= '9') || s->next[0] == '.') {
-            s->value = strtod(s->next, (char**)&s->next);
+        if ((s->next[0] >= '0' && s->next[0] <= '9') || s->next[0] == '.')
+        {
+            s->value = strtod(s->next, (char **)&s->next);
             s->type = TOK_NUMBER;
-        } else {
+        }
+        else
+        {
             /* Look for a variable or builtin function call. */
-            if (isalpha(s->next[0])) {
+            if (isalpha(s->next[0]))
+            {
                 const char *start;
                 start = s->next;
-                while (isalpha(s->next[0]) || isdigit(s->next[0]) || (s->next[0] == '_')) s->next++;
-                
+                while (isalpha(s->next[0]) || isdigit(s->next[0]) || (s->next[0] == '_'))
+                    s->next++;
+
                 const te_variable *var = find_lookup(s, start, s->next - start);
-                if (!var) var = find_builtin(start, s->next - start);
+                if (!var)
+                    var = find_builtin(start, s->next - start);
 
-                if (!var) {
+                if (!var)
+                {
                     s->type = TOK_ERROR;
-                } else {
-                    switch(TYPE_MASK(var->type))
+                }
+                else
+                {
+                    switch (TYPE_MASK(var->type))
                     {
-                        case TE_VARIABLE:
-                            s->type = TOK_VARIABLE;
-                            s->bound = var->address;
-                            break;
+                    case TE_VARIABLE:
+                        s->type = TOK_VARIABLE;
+                        s->bound = var->address;
+                        break;
 
-                        case TE_CLOSURE0: case TE_CLOSURE1: case TE_CLOSURE2: case TE_CLOSURE3:         /* Falls through. */
-                        case TE_CLOSURE4: case TE_CLOSURE5: case TE_CLOSURE6: case TE_CLOSURE7:         /* Falls through. */
-                            s->context = var->context;                                                  /* Falls through. */
+                    case TE_CLOSURE0:
+                    case TE_CLOSURE1:
+                    case TE_CLOSURE2:
+                    case TE_CLOSURE3: /* Falls through. */
+                    case TE_CLOSURE4:
+                    case TE_CLOSURE5:
+                    case TE_CLOSURE6:
+                    case TE_CLOSURE7:              /* Falls through. */
+                        s->context = var->context; /* Falls through. */
 
-                        case TE_FUNCTION0: case TE_FUNCTION1: case TE_FUNCTION2: case TE_FUNCTION3:     /* Falls through. */
-                        case TE_FUNCTION4: case TE_FUNCTION5: case TE_FUNCTION6: case TE_FUNCTION7:     /* Falls through. */
-                            s->type = var->type;
-                            s->function = var->address;
-                            break;
+                    case TE_FUNCTION0:
+                    case TE_FUNCTION1:
+                    case TE_FUNCTION2:
+                    case TE_FUNCTION3: /* Falls through. */
+                    case TE_FUNCTION4:
+                    case TE_FUNCTION5:
+                    case TE_FUNCTION6:
+                    case TE_FUNCTION7: /* Falls through. */
+                        s->type = var->type;
+                        s->function = var->address;
+                        break;
                     }
                 }
-
-            } else {
+            }
+            else
+            {
                 /* Look for an operator or special character. */
-                switch (s->next++[0]) {
-                    case '+': s->type = TOK_INFIX; s->function = add; break;
-                    case '-': s->type = TOK_INFIX; s->function = sub; break;
-                    case '*': s->type = TOK_INFIX; s->function = mul; break;
-                    case '/': s->type = TOK_INFIX; s->function = divide; break;
-                    case '^': s->type = TOK_INFIX; s->function = pow; break;
-                    case '%': s->type = TOK_INFIX; s->function = fmod; break;
-                    case '(': s->type = TOK_OPEN; break;
-                    case ')': s->type = TOK_CLOSE; break;
-                    case ',': s->type = TOK_SEP; break;
-                    case ' ': case '\t': case '\n': case '\r': break;
-                    default: s->type = TOK_ERROR; break;
+                switch (s->next++[0])
+                {
+                case '+':
+                    s->type = TOK_INFIX;
+                    s->function = add;
+                    break;
+                case '-':
+                    s->type = TOK_INFIX;
+                    s->function = sub;
+                    break;
+                case '*':
+                    s->type = TOK_INFIX;
+                    s->function = mul;
+                    break;
+                case '/':
+                    s->type = TOK_INFIX;
+                    s->function = divide;
+                    break;
+                case '^':
+                    s->type = TOK_INFIX;
+                    s->function = pow;
+                    break;
+                case '%':
+                    s->type = TOK_INFIX;
+                    s->function = fmod;
+                    break;
+                case '(':
+                    s->type = TOK_OPEN;
+                    break;
+                case ')':
+                    s->type = TOK_CLOSE;
+                    break;
+                case ',':
+                    s->type = TOK_SEP;
+                    break;
+                case ' ':
+                case '\t':
+                case '\n':
+                case '\r':
+                    break;
+                default:
+                    s->type = TOK_ERROR;
+                    break;
                 }
             }
         }
     } while (s->type == TOK_NULL);
 }
 
-
 static te_expr *list(state *s);
 static te_expr *expr(state *s);
 static te_expr *power(state *s);
 
-static te_expr *base(state *s) {
+/// @brief Parse a base expression.
+///
+/// This function parses a base expression, which can be a constant, a variable, a function with no arguments,
+/// a function with one argument followed by a power expression, a function with multiple arguments, or a parenthesized list of expressions.
+/// It constructs a syntax tree representing the base expression.
+///
+/// @param s A pointer to the current state of the parser.
+/// @return A pointer to the root of the syntax tree representing the base expression.
+static te_expr *base(state *s)
+{
     /* <base>      =    <constant> | <variable> | <function-0> {"(" ")"} | <function-1> <power> | <function-X> "(" <expr> {"," <expr>} ")" | "(" <list> ")" */
     te_expr *ret;
     int arity;
 
-    switch (TYPE_MASK(s->type)) {
-        case TOK_NUMBER:
-            ret = new_expr(TE_CONSTANT, 0);
-            CHECK_NULL(ret);
+    switch (TYPE_MASK(s->type))
+    {
+    case TOK_NUMBER:
+        ret = new_expr(TE_CONSTANT, 0);
+        CHECK_NULL(ret);
 
-            ret->value = s->value;
+        ret->value = s->value;
+        next_token(s);
+        break;
+
+    case TOK_VARIABLE:
+        ret = new_expr(TE_VARIABLE, 0);
+        CHECK_NULL(ret);
+
+        ret->bound = s->bound;
+        next_token(s);
+        break;
+
+    case TE_FUNCTION0:
+    case TE_CLOSURE0:
+        ret = new_expr(s->type, 0);
+        CHECK_NULL(ret);
+
+        ret->function = s->function;
+        if (IS_CLOSURE(s->type))
+            ret->parameters[0] = s->context;
+        next_token(s);
+        if (s->type == TOK_OPEN)
+        {
             next_token(s);
-            break;
-
-        case TOK_VARIABLE:
-            ret = new_expr(TE_VARIABLE, 0);
-            CHECK_NULL(ret);
-
-            ret->bound = s->bound;
-            next_token(s);
-            break;
-
-        case TE_FUNCTION0:
-        case TE_CLOSURE0:
-            ret = new_expr(s->type, 0);
-            CHECK_NULL(ret);
-
-            ret->function = s->function;
-            if (IS_CLOSURE(s->type)) ret->parameters[0] = s->context;
-            next_token(s);
-            if (s->type == TOK_OPEN) {
-                next_token(s);
-                if (s->type != TOK_CLOSE) {
-                    s->type = TOK_ERROR;
-                } else {
-                    next_token(s);
-                }
-            }
-            break;
-
-        case TE_FUNCTION1:
-        case TE_CLOSURE1:
-            ret = new_expr(s->type, 0);
-            CHECK_NULL(ret);
-
-            ret->function = s->function;
-            if (IS_CLOSURE(s->type)) ret->parameters[1] = s->context;
-            next_token(s);
-            ret->parameters[0] = power(s);
-            CHECK_NULL(ret->parameters[0], te_free(ret));
-            break;
-
-        case TE_FUNCTION2: case TE_FUNCTION3: case TE_FUNCTION4:
-        case TE_FUNCTION5: case TE_FUNCTION6: case TE_FUNCTION7:
-        case TE_CLOSURE2: case TE_CLOSURE3: case TE_CLOSURE4:
-        case TE_CLOSURE5: case TE_CLOSURE6: case TE_CLOSURE7:
-            arity = ARITY(s->type);
-
-            ret = new_expr(s->type, 0);
-            CHECK_NULL(ret);
-
-            ret->function = s->function;
-            if (IS_CLOSURE(s->type)) ret->parameters[arity] = s->context;
-            next_token(s);
-
-            if (s->type != TOK_OPEN) {
+            if (s->type != TOK_CLOSE)
+            {
                 s->type = TOK_ERROR;
-            } else {
-                int i;
-                for(i = 0; i < arity; i++) {
-                    next_token(s);
-                    ret->parameters[i] = expr(s);
-                    CHECK_NULL(ret->parameters[i], te_free(ret));
-
-                    if(s->type != TOK_SEP) {
-                        break;
-                    }
-                }
-                if(s->type != TOK_CLOSE || i != arity - 1) {
-                    s->type = TOK_ERROR;
-                } else {
-                    next_token(s);
-                }
             }
-
-            break;
-
-        case TOK_OPEN:
-            next_token(s);
-            ret = list(s);
-            CHECK_NULL(ret);
-
-            if (s->type != TOK_CLOSE) {
-                s->type = TOK_ERROR;
-            } else {
+            else
+            {
                 next_token(s);
             }
-            break;
+        }
+        break;
 
-        default:
-            ret = new_expr(0, 0);
-            CHECK_NULL(ret);
+    case TE_FUNCTION1:
+    case TE_CLOSURE1:
+        ret = new_expr(s->type, 0);
+        CHECK_NULL(ret);
 
+        ret->function = s->function;
+        if (IS_CLOSURE(s->type))
+            ret->parameters[1] = s->context;
+        next_token(s);
+        ret->parameters[0] = power(s);
+        CHECK_NULL(ret->parameters[0], te_free(ret));
+        break;
+
+    case TE_FUNCTION2:
+    case TE_FUNCTION3:
+    case TE_FUNCTION4:
+    case TE_FUNCTION5:
+    case TE_FUNCTION6:
+    case TE_FUNCTION7:
+    case TE_CLOSURE2:
+    case TE_CLOSURE3:
+    case TE_CLOSURE4:
+    case TE_CLOSURE5:
+    case TE_CLOSURE6:
+    case TE_CLOSURE7:
+        arity = ARITY(s->type);
+
+        ret = new_expr(s->type, 0);
+        CHECK_NULL(ret);
+
+        ret->function = s->function;
+        if (IS_CLOSURE(s->type))
+            ret->parameters[arity] = s->context;
+        next_token(s);
+
+        if (s->type != TOK_OPEN)
+        {
             s->type = TOK_ERROR;
-            ret->value = NAN;
-            break;
+        }
+        else
+        {
+            int i;
+            for (i = 0; i < arity; i++)
+            {
+                next_token(s);
+                ret->parameters[i] = expr(s);
+                CHECK_NULL(ret->parameters[i], te_free(ret));
+
+                if (s->type != TOK_SEP)
+                {
+                    break;
+                }
+            }
+            if (s->type != TOK_CLOSE || i != arity - 1)
+            {
+                s->type = TOK_ERROR;
+            }
+            else
+            {
+                next_token(s);
+            }
+        }
+
+        break;
+
+    case TOK_OPEN:
+        next_token(s);
+        ret = list(s);
+        CHECK_NULL(ret);
+
+        if (s->type != TOK_CLOSE)
+        {
+            s->type = TOK_ERROR;
+        }
+        else
+        {
+            next_token(s);
+        }
+        break;
+
+    default:
+        ret = new_expr(0, 0);
+        CHECK_NULL(ret);
+
+        s->type = TOK_ERROR;
+        ret->value = NAN;
+        break;
     }
 
     return ret;
 }
 
-
-static te_expr *power(state *s) {
+/// @brief Parse a power expression.
+///
+/// This function parses a power expression which consists of an optional sign followed by a base
+/// and constructs a syntax tree representing the expression.
+///
+/// @param s A pointer to the current state of the parser.
+/// @return A pointer to the root of the syntax tree representing the power expression.
+static te_expr *power(state *s)
+{
     /* <power>     =    {("-" | "+")} <base> */
     int sign = 1;
-    while (s->type == TOK_INFIX && (s->function == add || s->function == sub)) {
-        if (s->function == sub) sign = -sign;
+    while (s->type == TOK_INFIX && (s->function == add || s->function == sub))
+    {
+        if (s->function == sub)
+            sign = -sign;
         next_token(s);
     }
 
     te_expr *ret;
 
-    if (sign == 1) {
+    if (sign == 1)
+    {
         ret = base(s);
-    } else {
+    }
+    else
+    {
         te_expr *b = base(s);
         CHECK_NULL(b);
 
@@ -445,14 +658,16 @@ static te_expr *power(state *s) {
 }
 
 #ifdef TE_POW_FROM_RIGHT
-static te_expr *factor(state *s) {
+static te_expr *factor(state *s)
+{
     /* <factor>    =    <power> {"^" <power>} */
     te_expr *ret = power(s);
     CHECK_NULL(ret);
 
     int neg = 0;
 
-    if (ret->type == (TE_FUNCTION1 | TE_FLAG_PURE) && ret->function == negate) {
+    if (ret->type == (TE_FUNCTION1 | TE_FLAG_PURE) && ret->function == negate)
+    {
         te_expr *se = ret->parameters[0];
         free(ret);
         ret = se;
@@ -461,11 +676,13 @@ static te_expr *factor(state *s) {
 
     te_expr *insertion = 0;
 
-    while (s->type == TOK_INFIX && (s->function == pow)) {
+    while (s->type == TOK_INFIX && (s->function == pow))
+    {
         te_fun2 t = s->function;
         next_token(s);
 
-        if (insertion) {
+        if (insertion)
+        {
             /* Make exponentiation go right-to-left. */
             te_expr *p = power(s);
             CHECK_NULL(p, te_free(ret));
@@ -476,7 +693,9 @@ static te_expr *factor(state *s) {
             insert->function = t;
             insertion->parameters[1] = insert;
             insertion = insert;
-        } else {
+        }
+        else
+        {
             te_expr *p = power(s);
             CHECK_NULL(p, te_free(ret));
 
@@ -489,7 +708,8 @@ static te_expr *factor(state *s) {
         }
     }
 
-    if (neg) {
+    if (neg)
+    {
         te_expr *prev = ret;
         ret = NEW_EXPR(TE_FUNCTION1 | TE_FLAG_PURE, ret);
         CHECK_NULL(ret, te_free(prev));
@@ -500,12 +720,14 @@ static te_expr *factor(state *s) {
     return ret;
 }
 #else
-static te_expr *factor(state *s) {
+static te_expr *factor(state *s)
+{
     /* <factor>    =    <power> {"^" <power>} */
     te_expr *ret = power(s);
     CHECK_NULL(ret);
 
-    while (s->type == TOK_INFIX && (s->function == pow)) {
+    while (s->type == TOK_INFIX && (s->function == pow))
+    {
         te_fun2 t = s->function;
         next_token(s);
         te_expr *p = power(s);
@@ -522,14 +744,21 @@ static te_expr *factor(state *s) {
 }
 #endif
 
-
-
-static te_expr *term(state *s) {
+/// @brief Parse a term.
+///
+/// This function parses a term consisting of factors separated by multiplication, division, or modulo operators
+/// and constructs a syntax tree representing the term.
+///
+/// @param s A pointer to the current state of the parser.
+/// @return A pointer to the root of the syntax tree representing the term.
+static te_expr *term(state *s)
+{
     /* <term>      =    <factor> {("*" | "/" | "%") <factor>} */
     te_expr *ret = factor(s);
     CHECK_NULL(ret);
 
-    while (s->type == TOK_INFIX && (s->function == mul || s->function == divide || s->function == fmod)) {
+    while (s->type == TOK_INFIX && (s->function == mul || s->function == divide || s->function == fmod))
+    {
         te_fun2 t = s->function;
         next_token(s);
         te_expr *f = factor(s);
@@ -545,13 +774,21 @@ static te_expr *term(state *s) {
     return ret;
 }
 
-
-static te_expr *expr(state *s) {
+/// @brief Parse an expression.
+///
+/// This function parses an expression consisting of terms separated by addition or subtraction operators
+/// and constructs a syntax tree representing the expression.
+///
+/// @param s A pointer to the current state of the parser.
+/// @return A pointer to the root of the syntax tree representing the expression.
+static te_expr *expr(state *s)
+{
     /* <expr>      =    <term> {("+" | "-") <term>} */
     te_expr *ret = term(s);
     CHECK_NULL(ret);
 
-    while (s->type == TOK_INFIX && (s->function == add || s->function == sub)) {
+    while (s->type == TOK_INFIX && (s->function == add || s->function == sub))
+    {
         te_fun2 t = s->function;
         next_token(s);
         te_expr *te = term(s);
@@ -567,13 +804,21 @@ static te_expr *expr(state *s) {
     return ret;
 }
 
-
-static te_expr *list(state *s) {
+/// @brief Parse a list of expressions separated by commas.
+///
+/// This function parses a list of expressions separated by commas and constructs a syntax tree
+/// representing the list.
+///
+/// @param s A pointer to the current state of the parser.
+/// @return A pointer to the root of the syntax tree representing the list of expressions.
+static te_expr *list(state *s)
+{
     /* <list>      =    <expr> {"," <expr>} */
     te_expr *ret = expr(s);
     CHECK_NULL(ret);
 
-    while (s->type == TOK_SEP) {
+    while (s->type == TOK_SEP)
+    {
         next_token(s);
         te_expr *e = expr(s);
         CHECK_NULL(e, te_free(ret));
@@ -588,71 +833,127 @@ static te_expr *list(state *s) {
     return ret;
 }
 
-
-#define TE_FUN(...) ((double(*)(__VA_ARGS__))n->function)
+#define TE_FUN(...) ((double (*)(__VA_ARGS__))n->function)
 #define M(e) te_eval(n->parameters[e])
 
+/// @brief Evaluate a syntax tree representing a mathematical expression.
+///
+/// This function evaluates a syntax tree representing a mathematical expression.
+/// It recursively evaluates the expression starting from the root node.
+///
+/// @param n A pointer to the root of the syntax tree to be evaluated.
+/// @return The result of the evaluation if successful, otherwise NaN (not a number).
+double te_eval(const te_expr *n)
+{
+    if (!n)
+        return NAN;
 
-double te_eval(const te_expr *n) {
-    if (!n) return NAN;
+    switch (TYPE_MASK(n->type))
+    {
+    case TE_CONSTANT:
+        return n->value;
+    case TE_VARIABLE:
+        return *n->bound;
 
-    switch(TYPE_MASK(n->type)) {
-        case TE_CONSTANT: return n->value;
-        case TE_VARIABLE: return *n->bound;
+    case TE_FUNCTION0:
+    case TE_FUNCTION1:
+    case TE_FUNCTION2:
+    case TE_FUNCTION3:
+    case TE_FUNCTION4:
+    case TE_FUNCTION5:
+    case TE_FUNCTION6:
+    case TE_FUNCTION7:
+        switch (ARITY(n->type))
+        {
+        case 0:
+            return TE_FUN(void)();
+        case 1:
+            return TE_FUN(double)(M(0));
+        case 2:
+            return TE_FUN(double, double)(M(0), M(1));
+        case 3:
+            return TE_FUN(double, double, double)(M(0), M(1), M(2));
+        case 4:
+            return TE_FUN(double, double, double, double)(M(0), M(1), M(2), M(3));
+        case 5:
+            return TE_FUN(double, double, double, double, double)(M(0), M(1), M(2), M(3), M(4));
+        case 6:
+            return TE_FUN(double, double, double, double, double, double)(M(0), M(1), M(2), M(3), M(4), M(5));
+        case 7:
+            return TE_FUN(double, double, double, double, double, double, double)(M(0), M(1), M(2), M(3), M(4), M(5), M(6));
+        default:
+            return NAN;
+        }
 
-        case TE_FUNCTION0: case TE_FUNCTION1: case TE_FUNCTION2: case TE_FUNCTION3:
-        case TE_FUNCTION4: case TE_FUNCTION5: case TE_FUNCTION6: case TE_FUNCTION7:
-            switch(ARITY(n->type)) {
-                case 0: return TE_FUN(void)();
-                case 1: return TE_FUN(double)(M(0));
-                case 2: return TE_FUN(double, double)(M(0), M(1));
-                case 3: return TE_FUN(double, double, double)(M(0), M(1), M(2));
-                case 4: return TE_FUN(double, double, double, double)(M(0), M(1), M(2), M(3));
-                case 5: return TE_FUN(double, double, double, double, double)(M(0), M(1), M(2), M(3), M(4));
-                case 6: return TE_FUN(double, double, double, double, double, double)(M(0), M(1), M(2), M(3), M(4), M(5));
-                case 7: return TE_FUN(double, double, double, double, double, double, double)(M(0), M(1), M(2), M(3), M(4), M(5), M(6));
-                default: return NAN;
-            }
+    case TE_CLOSURE0:
+    case TE_CLOSURE1:
+    case TE_CLOSURE2:
+    case TE_CLOSURE3:
+    case TE_CLOSURE4:
+    case TE_CLOSURE5:
+    case TE_CLOSURE6:
+    case TE_CLOSURE7:
+        switch (ARITY(n->type))
+        {
+        case 0:
+            return TE_FUN(void *)(n->parameters[0]);
+        case 1:
+            return TE_FUN(void *, double)(n->parameters[1], M(0));
+        case 2:
+            return TE_FUN(void *, double, double)(n->parameters[2], M(0), M(1));
+        case 3:
+            return TE_FUN(void *, double, double, double)(n->parameters[3], M(0), M(1), M(2));
+        case 4:
+            return TE_FUN(void *, double, double, double, double)(n->parameters[4], M(0), M(1), M(2), M(3));
+        case 5:
+            return TE_FUN(void *, double, double, double, double, double)(n->parameters[5], M(0), M(1), M(2), M(3), M(4));
+        case 6:
+            return TE_FUN(void *, double, double, double, double, double, double)(n->parameters[6], M(0), M(1), M(2), M(3), M(4), M(5));
+        case 7:
+            return TE_FUN(void *, double, double, double, double, double, double, double)(n->parameters[7], M(0), M(1), M(2), M(3), M(4), M(5), M(6));
+        default:
+            return NAN;
+        }
 
-        case TE_CLOSURE0: case TE_CLOSURE1: case TE_CLOSURE2: case TE_CLOSURE3:
-        case TE_CLOSURE4: case TE_CLOSURE5: case TE_CLOSURE6: case TE_CLOSURE7:
-            switch(ARITY(n->type)) {
-                case 0: return TE_FUN(void*)(n->parameters[0]);
-                case 1: return TE_FUN(void*, double)(n->parameters[1], M(0));
-                case 2: return TE_FUN(void*, double, double)(n->parameters[2], M(0), M(1));
-                case 3: return TE_FUN(void*, double, double, double)(n->parameters[3], M(0), M(1), M(2));
-                case 4: return TE_FUN(void*, double, double, double, double)(n->parameters[4], M(0), M(1), M(2), M(3));
-                case 5: return TE_FUN(void*, double, double, double, double, double)(n->parameters[5], M(0), M(1), M(2), M(3), M(4));
-                case 6: return TE_FUN(void*, double, double, double, double, double, double)(n->parameters[6], M(0), M(1), M(2), M(3), M(4), M(5));
-                case 7: return TE_FUN(void*, double, double, double, double, double, double, double)(n->parameters[7], M(0), M(1), M(2), M(3), M(4), M(5), M(6));
-                default: return NAN;
-            }
-
-        default: return NAN;
+    default:
+        return NAN;
     }
-
 }
 
 #undef TE_FUN
 #undef M
 
-static void optimize(te_expr *n) {
+/// @brief Optimize a syntax tree by evaluating constant expressions.
+///
+/// This function optimizes a syntax tree by evaluating constant expressions where possible.
+/// It recursively evaluates expressions and replaces them with constant nodes if all arguments
+/// are constants.
+///
+/// @param n A pointer to the root of the syntax tree to be optimized.
+static void optimize(te_expr *n)
+{
     /* Evaluates as much as possible. */
-    if (n->type == TE_CONSTANT) return;
-    if (n->type == TE_VARIABLE) return;
+    if (n->type == TE_CONSTANT)
+        return;
+    if (n->type == TE_VARIABLE)
+        return;
 
     /* Only optimize out functions flagged as pure. */
-    if (IS_PURE(n->type)) {
+    if (IS_PURE(n->type))
+    {
         const int arity = ARITY(n->type);
         int known = 1;
         int i;
-        for (i = 0; i < arity; ++i) {
+        for (i = 0; i < arity; ++i)
+        {
             optimize(n->parameters[i]);
-            if (((te_expr*)(n->parameters[i]))->type != TE_CONSTANT) {
+            if (((te_expr *)(n->parameters[i]))->type != TE_CONSTANT)
+            {
                 known = 0;
             }
         }
-        if (known) {
+        if (known)
+        {
             const double value = te_eval(n);
             te_free_parameters(n);
             n->type = TE_CONSTANT;
@@ -661,8 +962,18 @@ static void optimize(te_expr *n) {
     }
 }
 
-
-te_expr *te_compile(const char *expression, const te_variable *variables, int var_count, int *error) {
+/// @brief Compile a mathematical expression into a syntax tree.
+///
+/// This function compiles a mathematical expression represented as a string into a syntax tree
+/// of te_expr nodes. It performs lexical analysis and parsing of the expression.
+///
+/// @param expression The mathematical expression to be compiled.
+/// @param variables An array of te_variable structures representing variables in the expression.
+/// @param var_count The number of variables in the 'variables' array.
+/// @param error A pointer to an integer where the error status will be stored (0 if no error).
+/// @return A pointer to the root of the syntax tree if compilation is successful, otherwise NULL.
+te_expr *te_compile(const char *expression, const te_variable *variables, int var_count, int *error)
+{
     state s;
     s.start = s.next = expression;
     s.lookup = variables;
@@ -670,68 +981,121 @@ te_expr *te_compile(const char *expression, const te_variable *variables, int va
 
     next_token(&s);
     te_expr *root = list(&s);
-    if (root == NULL) {
-        if (error) *error = -1;
+    if (root == NULL)
+    {
+        if (error)
+            *error = -1;
         return NULL;
     }
 
-    if (s.type != TOK_END) {
+    if (s.type != TOK_END)
+    {
         te_free(root);
-        if (error) {
+        if (error)
+        {
             *error = (s.next - s.start);
-            if (*error == 0) *error = 1;
+            if (*error == 0)
+                *error = 1;
         }
         return 0;
-    } else {
+    }
+    else
+    {
         optimize(root);
-        if (error) *error = 0;
+        if (error)
+            *error = 0;
         return root;
     }
 }
 
-
-double te_interp(const char *expression, int *error) {
+/// @brief Interpret and evaluate a mathematical expression.
+///
+/// This function compiles and evaluates a mathematical expression represented as a string.
+/// If successful, it returns the result of the evaluation. If an error occurs during compilation,
+/// it sets the value pointed to by 'error' to a non-zero value.
+///
+/// @param expression The mathematical expression to be interpreted and evaluated.
+/// @param error A pointer to an integer where the error status will be stored (0 if no error).
+/// @return The result of the evaluation if successful, otherwise NaN (not a number).
+double te_interp(const char *expression, int *error)
+{
     te_expr *n = te_compile(expression, 0, 0, error);
-    if (n == NULL) {
+    if (n == NULL)
+    {
         return NAN;
     }
 
     double ret;
-    if (n) {
+    if (n)
+    {
         ret = te_eval(n);
         te_free(n);
-    } else {
+    }
+    else
+    {
         ret = NAN;
     }
     return ret;
 }
 
-static void pn (const te_expr *n, int depth) {
+/// @brief Print a te_expr node recursively.
+///
+/// This function prints the contents of a te_expr node recursively, with indentation
+/// corresponding to the depth of the recursion.
+///
+/// @param n A pointer to the te_expr node to be printed.
+/// @param depth The depth of the recursion, used for indentation.
+static void pn(const te_expr *n, int depth)
+{
     int i, arity;
     printf("%*s", depth, "");
 
-    switch(TYPE_MASK(n->type)) {
-    case TE_CONSTANT: printf("%f\n", n->value); break;
-    case TE_VARIABLE: printf("bound %p\n", n->bound); break;
+    switch (TYPE_MASK(n->type))
+    {
+    case TE_CONSTANT:
+        printf("%f\n", n->value);
+        break;
+    case TE_VARIABLE:
+        printf("bound %p\n", n->bound);
+        break;
 
-    case TE_FUNCTION0: case TE_FUNCTION1: case TE_FUNCTION2: case TE_FUNCTION3:
-    case TE_FUNCTION4: case TE_FUNCTION5: case TE_FUNCTION6: case TE_FUNCTION7:
-    case TE_CLOSURE0: case TE_CLOSURE1: case TE_CLOSURE2: case TE_CLOSURE3:
-    case TE_CLOSURE4: case TE_CLOSURE5: case TE_CLOSURE6: case TE_CLOSURE7:
-         arity = ARITY(n->type);
-         printf("f%d", arity);
-         for(i = 0; i < arity; i++) {
-             printf(" %p", n->parameters[i]);
-         }
-         printf("\n");
-         for(i = 0; i < arity; i++) {
-             pn(n->parameters[i], depth + 1);
-         }
-         break;
+    case TE_FUNCTION0:
+    case TE_FUNCTION1:
+    case TE_FUNCTION2:
+    case TE_FUNCTION3:
+    case TE_FUNCTION4:
+    case TE_FUNCTION5:
+    case TE_FUNCTION6:
+    case TE_FUNCTION7:
+    case TE_CLOSURE0:
+    case TE_CLOSURE1:
+    case TE_CLOSURE2:
+    case TE_CLOSURE3:
+    case TE_CLOSURE4:
+    case TE_CLOSURE5:
+    case TE_CLOSURE6:
+    case TE_CLOSURE7:
+        arity = ARITY(n->type);
+        printf("f%d", arity);
+        for (i = 0; i < arity; i++)
+        {
+            printf(" %p", n->parameters[i]);
+        }
+        printf("\n");
+        for (i = 0; i < arity; i++)
+        {
+            pn(n->parameters[i], depth + 1);
+        }
+        break;
     }
 }
 
-
-void te_print(const te_expr *n) {
+/// @brief Print a te_expr node.
+///
+/// This function prints the contents of a te_expr node.
+///
+/// @param n A pointer to the te_expr node to be printed.
+void te_print(const te_expr *n)
+{
     pn(n, 0);
 }
